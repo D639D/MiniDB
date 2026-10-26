@@ -1,4 +1,3 @@
-
 trait ToBytes {
     type Output;
     fn to_bytes(&self) -> Self::Output;
@@ -7,10 +6,9 @@ trait FromBytes: Sized {
     fn from_bytes(bytes: Vec<u8>) -> Option<Self>;
 }
 
-
 impl ToBytes for i32 {
     type Output = Vec<u8>;
-    fn to_bytes (&self) -> Self::Output {
+    fn to_bytes(&self) -> Self::Output {
         self.to_ne_bytes().to_vec()
     }
 }
@@ -20,7 +18,6 @@ impl FromBytes for i32 {
         Some(i32::from_ne_bytes(array))
     }
 }
-
 
 impl ToBytes for f64 {
     type Output = Vec<u8>;
@@ -35,7 +32,6 @@ impl FromBytes for f64 {
     }
 }
 
-
 impl ToBytes for String {
     type Output = Vec<u8>;
     fn to_bytes(&self) -> Self::Output {
@@ -49,24 +45,50 @@ impl FromBytes for String {
 }
 
 fn main() {
-    let num_int = 42;
-    let bytes_int = num_int.to_bytes();
-    println!("{:?}", &bytes_int);
-    if let Some(i) = i32::from_bytes(bytes_int) {
-        println!("{:?}", i)
-    }
+    // let num_int = 42;
+    // let bytes_int = num_int.to_bytes();
+    // println!("{:?}", &bytes_int);
+    // if let Some(i) = i32::from_bytes(bytes_int) {
+    //     println!("{:?}", i)
+    // }
 
-    let num_float = 42.0;
-    let bytes_float = num_float.to_bytes();
-    println!("{:?}", &bytes_float);
-    if let Some(i) = f64::from_bytes(bytes_float) {
-        println!("{:?}", i)
-    }
+    // let num_float = 42.0;
+    // let bytes_float = num_float.to_bytes();
+    // println!("{:?}", &bytes_float);
+    // if let Some(i) = f64::from_bytes(bytes_float) {
+    //     println!("{:?}", i)
+    // }
 
-    let num_str = String::from("42");
-    let bytes_str = num_str.to_bytes();
-    println!("{:?}", &bytes_str);
-    if let Some(i) = String::from_bytes(bytes_str) {
-        println!("{:?}", i)
+    let num_int = 4252;
+    let bytes_str = num_int.to_bytes();
+    let len = bytes_str.len();
+    let prefix: [u8; 1] = [1];
+    let mut result = Vec::with_capacity(len + 1);
+    result.extend_from_slice(&prefix);
+    result.extend_from_slice(&bytes_str);
+    read_cell(&result, len);
+}
+
+fn read_cell(bytes: &[u8], len: usize) {
+    match bytes[0] {
+        1 => {
+            let tmp = bytes[1..=4].to_vec();
+            if let Some(i) = i32::from_bytes(tmp) {
+                println!("{:?}", i)
+            }
+        }
+        2 => {
+            let tmp = bytes[1..=8].to_vec();
+            if let Some(i) = f64::from_bytes(tmp) {
+                println!("{:?}", i)
+            }
+        }
+        3 => {
+            let tmp = bytes[1..=len].to_vec();
+            if let Some(i) = String::from_bytes(tmp) {
+                println!("{:?}", i)
+            }
+        }
+        _ => {}
     }
 }
