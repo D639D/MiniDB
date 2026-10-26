@@ -59,17 +59,17 @@ fn main() {
     //     println!("{:?}", i)
     // }
 
-    let num_int = 4252;
+    let num_int = String::from("HELLO");
     let bytes_str = num_int.to_bytes();
     let len = bytes_str.len();
-    let prefix: [u8; 1] = [1];
+    let prefix: [u8; 2] = [3, len as u8];
     let mut result = Vec::with_capacity(len + 1);
     result.extend_from_slice(&prefix);
     result.extend_from_slice(&bytes_str);
-    read_cell(&result, len);
+    read_cell(&result);
 }
 
-fn read_cell(bytes: &[u8], len: usize) {
+fn read_cell(bytes: &[u8]) {
     match bytes[0] {
         1 => {
             let tmp = bytes[1..=4].to_vec();
@@ -84,7 +84,8 @@ fn read_cell(bytes: &[u8], len: usize) {
             }
         }
         3 => {
-            let tmp = bytes[1..=len].to_vec();
+            let len = bytes[1];
+            let tmp = bytes[2..2 + len as usize].to_vec();
             if let Some(i) = String::from_bytes(tmp) {
                 println!("{:?}", i)
             }
