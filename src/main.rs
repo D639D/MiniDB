@@ -1,3 +1,19 @@
+#[allow(dead_code)]
+#[derive(Debug)]
+enum Types {
+    Int(i32),
+    Float(f64),
+    Text(String),
+}
+#[allow(dead_code)]
+#[derive(Debug)] 
+enum Error {
+    IntErr(String),
+    FloatErr(String),
+    TextErr(String),
+    OtherErr(String),
+}
+
 trait ToBytes {
     type Output;
     fn to_bytes(&self) -> Self::Output;
@@ -59,37 +75,52 @@ fn main() {
     //     println!("{:?}", i)
     // }
 
-    let num_int = String::from("HELLO");
+    let num_int = 32;
     let bytes_str = num_int.to_bytes();
     let len = bytes_str.len();
-    let prefix: [u8; 2] = [3, len as u8];
+    let prefix: [u8; 1] = [1];
     let mut result = Vec::with_capacity(len + 1);
     result.extend_from_slice(&prefix);
     result.extend_from_slice(&bytes_str);
-    read_cell(&result);
+    println!("{:?}", read_cell(&result));
 }
 
-fn read_cell(bytes: &[u8]) {
-    match bytes[0] {
-        1 => {
-            let tmp = bytes[1..=4].to_vec();
-            if let Some(i) = i32::from_bytes(tmp) {
-                println!("{:?}", i)
-            }
+fn read_cell(bytes: &[u8]) -> Result<Types, Error> {
+    match bytes {
+        // пустой массив
+        [] => Err(Error::OtherErr("Массив пустой".into())),
+
+        // Int: 1 байт тега + ровно 4 байта данных
+        [1, data @ ..] => {
+            let arr: [u8; 4] = data.try_into()
+                .map_err(|_| Error::IntErr("Ожидалось 5 байт".into()))?;
+            i32::from_bytes(arr.to_vec())
+                .map(Types::Int)
+                .ok_or_else(|| Error::IntErr("Не удалось прочитать Int".into()))
         }
-        2 => {
-            let tmp = bytes[1..=8].to_vec();
-            if let Some(i) = f64::from_bytes(tmp) {
-                println!("{:?}", i)
-            }
+
+        // Float: 1 + 8 = 9 байт
+        [2, data @ ..] => {
+            let arr: [u8; 8] = data.try_into()
+                .map_err(|_| Error::FloatErr("Ожидалось 9 байт".into()))?;
+            f64::from_bytes(arr.to_vec())
+                .map(Types::Float)
+                .ok_or_else(|| Error::FloatErr("Не удалось прочитать Float".into()))
         }
-        3 => {
-            let len = bytes[1];
-            let tmp = bytes[2..2 + len as usize].to_vec();
-            if let Some(i) = String::from_bytes(tmp) {
-                println!("{:?}", i)
-            }
+
+        // Text: 1 байт тега + 1 байт длины + данные
+        [3, len, data @ ..] => {
+            let len = *len as usize;
+            let slice = data.get(..len)
+                .ok_or_else(|| Error::TextErr(
+                    format!("Массив короче заявленной длины ({len})")
+                ))?;
+            String::from_bytes(slice.to_vec())
+                .map(Types::Text)
+                .ok_or_else(|| Error::TextErr("Не удалось прочитать Text".into()))
         }
-        _ => {}
+
+        // любой другой тег
+        _ => Err(Error::OtherErr("Неизвестный тип ячейки".into())),
     }
 }
