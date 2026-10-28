@@ -1,21 +1,25 @@
-use std::fs::{File, OpenOptions};
-use std::io;
+use std::fs::File;
+use std::io::{self, Write};
 use std::path::Path;
 
-#[allow(dead_code)]
-#[derive(Debug)]
+
+#[derive(PartialEq, Debug)]
 enum Types {
     Int(i32),
     Float(f64),
     Text(String),
 }
-#[allow(dead_code)]
 #[derive(Debug)]
 enum Error {
     IntErr(String),
     FloatErr(String),
     TextErr(String),
     OtherErr(String),
+}
+
+
+struct Database {
+    file: File,
 }
 
 trait ToBytes {
@@ -26,15 +30,13 @@ trait FromBytes: Sized {
     fn from_bytes(bytes: Vec<u8>) -> Option<Self>;
 }
 
-trait CreateDb {
-    fn new_db(&self) -> Self;
-}
-
-
 impl ToBytes for i32 {
     type Output = Vec<u8>;
     fn to_bytes(&self) -> Self::Output {
-        self.to_ne_bytes().to_vec()
+        let mut result = Vec::with_capacity(5);
+        result.extend_from_slice(&[1]);
+        result.extend_from_slice(&self.to_ne_bytes());
+        result
     }
 }
 impl FromBytes for i32 {
@@ -47,7 +49,10 @@ impl FromBytes for i32 {
 impl ToBytes for f64 {
     type Output = Vec<u8>;
     fn to_bytes(&self) -> Self::Output {
-        self.to_ne_bytes().to_vec()
+        let mut result = Vec::with_capacity(9);
+        result.extend_from_slice(&[1]);
+        result.extend_from_slice(&self.to_ne_bytes());
+        result
     }
 }
 impl FromBytes for f64 {
@@ -60,7 +65,11 @@ impl FromBytes for f64 {
 impl ToBytes for String {
     type Output = Vec<u8>;
     fn to_bytes(&self) -> Self::Output {
-        self.as_bytes().to_vec()
+        let len = self.len();
+        let mut result = Vec::with_capacity(len + 2);
+        result.extend_from_slice(&[1]);
+        result.extend_from_slice(&self.as_bytes());
+        result
     }
 }
 impl FromBytes for String {
@@ -69,52 +78,65 @@ impl FromBytes for String {
     }
 }
 
-pub trait NewDB: Sized {
-    fn new(name: impl AsRef<Path>) -> io::Result<Self>;
-}
+impl Write for Database {
+    // Метод записи, для крейта "write_all"
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
 
-pub struct Db(File);
+        Database::write_all(self, buf)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
-impl NewDB for Db {
-    fn new(name: impl AsRef<Path>) -> io::Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(name)?;
-        Ok(Db(file))
+        Ok(buf.len())
+    }
+    // Хз что это, вроде как буфер
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
-fn main() {
+impl Database {
+    // Создание базы данных
+    fn create<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let file = File::create(path).map_err(|_| Error::OtherErr("Не удалось создать базу данных!".into()))?;
 
-    let num_int = 32;
-    let bytes_str = num_int.to_bytes();
-    let len = bytes_str.len();
-    let prefix: [u8; 1] = [1];
-    let mut result = Vec::with_capacity(len + 1);
-    result.extend_from_slice(&prefix);
-    result.extend_from_slice(&bytes_str);
-    println!("{:?}", read_cell(&result));
+            Ok(Database { file })
+    }
+    // Запись в базу данных
+    fn write_cell(&mut self, bites: &[u8]) -> Result<(), Error> {
+        self.write_all(bites)
+            .map_err(|_| Error::OtherErr("fs".into()))?;
+    
+        Ok(())
+    }
 }
 
+fn main(){
+    let mut db = Database::create("main").unwrap();
+}
+// Конвертация в байты
+fn convert_to_cell(cell: &Types) -> Vec<u8> {
+    match cell {
+        Types::Int(i) => i.to_bytes(),
+        Types::Float(f) => f.to_bytes(),
+        Types::Text(s) => s.to_bytes(),
+    }
+}
+// Чтение байтов
 fn read_cell(bytes: &[u8]) -> Result<(Types, usize), Error> {
     match bytes {
         // пустой массив
         [] => Err(Error::OtherErr("Массив пустой".into())),
 
         // Int: 1 байт тега + ровно 4 байта данных
-        [1, data @ ..] => {
-            let arr: [u8; 4] = data.try_into()
-                .map_err(|_| Error::IntErr("Ожидалось 5 байт".into()))?;
+        [1, a, b, c, d, ..] => {
+            let arr: [u8; 4] = [*a, *b, *c, *d];
             i32::from_bytes(arr.to_vec())
-                .map(|f|(Types::Int(f), 5))
+                .map(|i| (Types::Int(i), 5))
                 .ok_or_else(|| Error::IntErr("Не удалось прочитать Int".into()))
         }
 
         // Float: 1 + 8 = 9 байт
-        [2, data @ ..] => {
-            let arr: [u8; 8] = data.try_into()
-                .map_err(|_| Error::FloatErr("Ожидалось 9 байт".into()))?;
+        [2, a, b, c, d, e, f, g, h, ..] => {
+            let arr: [u8; 8] = [*a, *b, *c, *d, *e, *f, *g, *h];
             f64::from_bytes(arr.to_vec())
                 .map(|f| (Types::Float(f), 9))
                 .ok_or_else(|| Error::FloatErr("Не удалось прочитать Float".into()))
@@ -123,12 +145,11 @@ fn read_cell(bytes: &[u8]) -> Result<(Types, usize), Error> {
         // Text: 1 байт тега + 1 байт длины + данные
         [3, len, data @ ..] => {
             let len = *len as usize;
-            let slice = data.get(..len)
-                .ok_or_else(|| Error::TextErr(
-                    format!("Массив короче заявленной длины ({len})")
-                ))?;
+            let slice = data
+                .get(..len)
+                .ok_or_else(|| Error::TextErr(format!("Массив короче заявленной длины ({len})")))?;
             String::from_bytes(slice.to_vec())
-                .map(|f|(Types::Text(f), 2 + len))
+                .map(|s| (Types::Text(s), 2 + len))
                 .ok_or_else(|| Error::TextErr("Не удалось прочитать Text".into()))
         }
 
