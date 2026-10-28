@@ -112,7 +112,7 @@ fn read_cell(bytes: &[u8]) -> Result<(Types, usize), Error> {
         }
 
         // Float: 1 + 8 = 9 байт
-        [2, a, b, c, d, e, f, g, h, data @ ..] => {
+        [2, data @ ..] => {
             let arr: [u8; 8] = data.try_into()
                 .map_err(|_| Error::FloatErr("Ожидалось 9 байт".into()))?;
             f64::from_bytes(arr.to_vec())
