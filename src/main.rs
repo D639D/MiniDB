@@ -1,3 +1,7 @@
+use std::fs::{File, OpenOptions};
+use std::io;
+use std::path::Path;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 enum Types {
@@ -6,7 +10,7 @@ enum Types {
     Text(String),
 }
 #[allow(dead_code)]
-#[derive(Debug)] 
+#[derive(Debug)]
 enum Error {
     IntErr(String),
     FloatErr(String),
@@ -21,6 +25,11 @@ trait ToBytes {
 trait FromBytes: Sized {
     fn from_bytes(bytes: Vec<u8>) -> Option<Self>;
 }
+
+trait CreateDb {
+    fn new_db(&self) -> Self;
+}
+
 
 impl ToBytes for i32 {
     type Output = Vec<u8>;
@@ -60,20 +69,23 @@ impl FromBytes for String {
     }
 }
 
-fn main() {
-    // let num_int = 42;
-    // let bytes_int = num_int.to_bytes();
-    // println!("{:?}", &bytes_int);
-    // if let Some(i) = i32::from_bytes(bytes_int) {
-    //     println!("{:?}", i)
-    // }
+pub trait NewDB: Sized {
+    fn new(name: impl AsRef<Path>) -> io::Result<Self>;
+}
 
-    // let num_float = 42.0;
-    // let bytes_float = num_float.to_bytes();
-    // println!("{:?}", &bytes_float);
-    // if let Some(i) = f64::from_bytes(bytes_float) {
-    //     println!("{:?}", i)
-    // }
+pub struct Db(File);
+
+impl NewDB for Db {
+    fn new(name: impl AsRef<Path>) -> io::Result<Self> {
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(name)?;
+        Ok(Db(file))
+    }
+}
+
+fn main() {
 
     let num_int = 32;
     let bytes_str = num_int.to_bytes();
@@ -85,7 +97,7 @@ fn main() {
     println!("{:?}", read_cell(&result));
 }
 
-fn read_cell(bytes: &[u8]) -> Result<Types, Error> {
+fn read_cell(bytes: &[u8]) -> Result<(Types, usize), Error> {
     match bytes {
         // пустой массив
         [] => Err(Error::OtherErr("Массив пустой".into())),
@@ -95,16 +107,16 @@ fn read_cell(bytes: &[u8]) -> Result<Types, Error> {
             let arr: [u8; 4] = data.try_into()
                 .map_err(|_| Error::IntErr("Ожидалось 5 байт".into()))?;
             i32::from_bytes(arr.to_vec())
-                .map(Types::Int)
+                .map(|f|(Types::Int(f), 5))
                 .ok_or_else(|| Error::IntErr("Не удалось прочитать Int".into()))
         }
 
         // Float: 1 + 8 = 9 байт
-        [2, data @ ..] => {
+        [2, a, b, c, d, e, f, g, h, data @ ..] => {
             let arr: [u8; 8] = data.try_into()
                 .map_err(|_| Error::FloatErr("Ожидалось 9 байт".into()))?;
             f64::from_bytes(arr.to_vec())
-                .map(Types::Float)
+                .map(|f| (Types::Float(f), 9))
                 .ok_or_else(|| Error::FloatErr("Не удалось прочитать Float".into()))
         }
 
@@ -116,7 +128,7 @@ fn read_cell(bytes: &[u8]) -> Result<Types, Error> {
                     format!("Массив короче заявленной длины ({len})")
                 ))?;
             String::from_bytes(slice.to_vec())
-                .map(Types::Text)
+                .map(|f|(Types::Text(f), 2 + len))
                 .ok_or_else(|| Error::TextErr("Не удалось прочитать Text".into()))
         }
 
