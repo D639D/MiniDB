@@ -1,3 +1,5 @@
 pub mod enums;
-pub mod method;
+pub mod functions;
+pub mod methods;
 pub mod structs;
+pub mod traits;

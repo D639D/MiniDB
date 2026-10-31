@@ -1,13 +1,14 @@
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub enum Types {
     Int(i32),
     Float(f64),
     Text(String),
 }
+
 #[derive(Debug)]
-pub enum Error {
-    IntErr(String),
-    FloatErr(String),
-    TextErr(String),
-    OtherErr(String),
+pub enum DataBaseErr {
+    Int(String),
+    Float(String),
+    Str(String),
+    Other(String),
 }

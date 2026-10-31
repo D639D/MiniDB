@@ -1,11 +1,5 @@
-pub struct Database {
-    pub file: File,
-}
+use std::fs::File;
 
-pub trait ToBytes {
-    pub type Output;
-    pub fn to_bytes(&self) -> Self::Output;
-}
-pub trait FromBytes: Sized {
-    pub fn from_bytes(bytes: Vec<u8>) -> Option<Self>;
+pub struct DataBase {
+    pub file: File,
 }
