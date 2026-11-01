@@ -1,11 +1,7 @@
 use super::enums;
-use super::traits;
 use super::traits::FromBytes;
 
 // Преобразовать в байты
-pub fn variable<T: traits::ToBytes>(val: T) -> Result<Vec<u8>, enums::DataBaseErr> {
-    val.to_bytes()
-}
 
 // Преобразование байтов в значение
 pub fn read_cell(value: &[u8]) -> Result<(enums::Types, usize), enums::DataBaseErr> {

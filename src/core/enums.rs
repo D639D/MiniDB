@@ -12,3 +12,4 @@ pub enum DataBaseErr {
     Str(String),
     Other(String),
 }
+

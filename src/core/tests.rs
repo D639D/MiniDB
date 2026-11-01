@@ -24,11 +24,31 @@ mod tests {
     use crate::core::{functions, tests::temp_path};
 
     #[test]
-    fn overflow_u8() {
+    fn overflow_u8_int() {
         let mut db = temp_path();
-        let input = 255;
+        let input = 256;
         db.write_cell(input).expect("writ succed");
-        let row = db.read_row().expect("read row succeed");
+        let row = db.read_file().expect("read row succeed");
+        let cells = functions::read_bytes(&row).expect("parse row");
+        assert_eq!(cells.len(), 1);
+    }
+
+    #[test]
+    fn overflow_u8_float() {
+        let mut db = temp_path();
+        let input = 256.0;
+        db.write_cell(input).expect("writ succed");
+        let row = db.read_file().expect("read row succeed");
+        let cells = functions::read_bytes(&row).expect("parse row");
+        assert_eq!(cells.len(), 1);
+    }
+
+    #[test]
+    fn overflow_u8_string() {
+        let mut db = temp_path();
+        let input = String::from("ABDFFАGHIJKMNOPQRFSFSKGLFDGKJHKFАJGGKHKGLGFHKHJLFDFSFSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKL");
+        db.write_cell(input).expect("writ succed");
+        let row = db.read_file().expect("read row succeed");
         let cells = functions::read_bytes(&row).expect("parse row");
         assert_eq!(cells.len(), 1);
     }

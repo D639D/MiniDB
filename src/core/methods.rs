@@ -3,10 +3,9 @@ use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 use crate::core::enums::DataBaseErr;
-use crate::core::structs::DataBase;
 
 use super::enums;
-use super::functions;
+
 use super::structs;
 use super::traits;
 
@@ -31,7 +30,7 @@ impl fmt::Display for enums::DataBaseErr {
     }
 }
 
-impl std::error::Error for enums::DataBaseErr {}
+// impl std::error::Error for enums::DataBaseErr {}
 
 impl traits::ToBytes for i32 {
     fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
@@ -116,14 +115,14 @@ impl structs::DataBase {
         &mut self,
         value: T,
     ) -> Result<usize, enums::DataBaseErr> {
-        let bytes = functions::variable(value)?;
+        let bytes = value.to_bytes()?;
         self.file
             .write_all(&bytes)
             .map_err(|_| enums::DataBaseErr::Other("Ошибка записи байтов в файл".into()))?;
         Ok(bytes.len())
     }
     // Прочитать файл
-    pub fn read_row(&mut self) -> Result<Vec<u8>, enums::DataBaseErr> {
+    pub fn read_file(&mut self) -> Result<Vec<u8>, enums::DataBaseErr> {
         let _ = self
             .file
             .seek(SeekFrom::Start(0))
