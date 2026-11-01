@@ -2,13 +2,9 @@ use super::enums;
 use super::traits;
 use super::traits::FromBytes;
 
-
-
-
-
 // Преобразовать в байты
 pub fn variable<T: traits::ToBytes>(val: T) -> Result<Vec<u8>, enums::DataBaseErr> {
-    Ok(val.to_bytes())
+    val.to_bytes()
 }
 
 // Преобразование байтов в значение

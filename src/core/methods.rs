@@ -1,12 +1,14 @@
 use std::fmt::{self};
-use std::fs::{OpenOptions};
-use std::io::{SeekFrom, Seek, Write, Read};
+use std::fs::OpenOptions;
+use std::io::{Read, Seek, SeekFrom, Write};
 
-use super::functions;
+use crate::core::enums::DataBaseErr;
+use crate::core::structs::DataBase;
+
 use super::enums;
-use super::traits;
+use super::functions;
 use super::structs;
-
+use super::traits;
 
 impl fmt::Display for enums::Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -32,34 +34,41 @@ impl fmt::Display for enums::DataBaseErr {
 impl std::error::Error for enums::DataBaseErr {}
 
 impl traits::ToBytes for i32 {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
+        if *self > u8::MAX as i32 {
+            return Err(DataBaseErr::Str("Число слишком большое!".into()));
+        }
         let mut res = Vec::with_capacity(5);
         res.extend_from_slice(&[1]);
         res.extend_from_slice(&self.to_ne_bytes());
-        res
+        Ok(res)
     }
 }
 
 impl traits::ToBytes for f64 {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
+        if *self > u8::MAX as f64 {
+            return Err(DataBaseErr::Str("Число слишком большое!".into()));
+        }
         let mut res = Vec::with_capacity(9);
         res.extend_from_slice(&[2]);
         res.extend_from_slice(&self.to_ne_bytes());
-        res
+        Ok(res)
     }
 }
 
 impl traits::ToBytes for String {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
+        if self.len() > u8::MAX as usize {
+            return Err(DataBaseErr::Str("Строка слишком длинная!".into()));
+        }
         let mut res = Vec::new();
         res.extend_from_slice(&[3]);
         res.extend_from_slice(&[self.len() as u8]);
         res.extend_from_slice(self.as_bytes());
-        res
+        Ok(res)
     }
 }
-
-
 
 impl traits::FromBytes for i32 {
     type Output = i32;
@@ -93,16 +102,20 @@ impl structs::DataBase {
     // Создать базу данных
     pub fn create(name: &str) -> Result<structs::DataBase, enums::DataBaseErr> {
         let file = OpenOptions::new()
+            .write(true)
             .read(true)
             .create(true)
-            .append(true)
+            .truncate(true)
             .open(name)
             .map_err(|_| enums::DataBaseErr::Other("Ошибка создания базы данных!".into()))?;
 
         Ok(structs::DataBase { file })
     }
     // Записать байты
-    pub fn write_cell<T: traits::ToBytes>(&mut self, value: T) -> Result<usize, enums::DataBaseErr> {
+    pub fn write_cell<T: traits::ToBytes>(
+        &mut self,
+        value: T,
+    ) -> Result<usize, enums::DataBaseErr> {
         let bytes = functions::variable(value)?;
         self.file
             .write_all(&bytes)
