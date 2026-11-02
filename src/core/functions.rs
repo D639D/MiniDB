@@ -16,12 +16,12 @@ pub fn read_cell(value: &[u8]) -> Result<(enums::Types, usize), enums::DataBaseE
             let arr: [u8; 8] = [*a, *b, *c, *d, *e, *f, *g, *h];
             f64::from_bytes(arr.to_vec()).map(|f| (enums::Types::Float(f), arr.len() + 1))
         }
-        [3, len, data @ ..] => {
-            let len = *len as usize;
+        [3, a, b, c, d, data @ ..] => {
+            let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
             let arr = data.get(..len).ok_or_else(|| {
                 enums::DataBaseErr::Str("Не удалось получить срез по длинне массива".into())
             })?;
-            String::from_bytes(arr.to_vec()).map(|s| (enums::Types::Text(s), arr.len() + 2))
+            String::from_bytes(arr.to_vec()).map(|s| (enums::Types::Text(s), arr.len() + 5))
         }
         _ => Err(enums::DataBaseErr::Other("Тип не найден".into())),
     }

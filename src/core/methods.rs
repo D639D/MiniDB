@@ -34,9 +34,6 @@ impl fmt::Display for enums::DataBaseErr {
 
 impl traits::ToBytes for i32 {
     fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
-        if *self > u8::MAX as i32 {
-            return Err(DataBaseErr::Str("Число слишком большое!".into()));
-        }
         let mut res = Vec::with_capacity(5);
         res.extend_from_slice(&[1]);
         res.extend_from_slice(&self.to_ne_bytes());
@@ -46,9 +43,6 @@ impl traits::ToBytes for i32 {
 
 impl traits::ToBytes for f64 {
     fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
-        if *self > u8::MAX as f64 {
-            return Err(DataBaseErr::Str("Число слишком большое!".into()));
-        }
         let mut res = Vec::with_capacity(9);
         res.extend_from_slice(&[2]);
         res.extend_from_slice(&self.to_ne_bytes());
@@ -58,12 +52,9 @@ impl traits::ToBytes for f64 {
 
 impl traits::ToBytes for String {
     fn to_bytes(&self) -> Result<Vec<u8>, DataBaseErr> {
-        if self.len() > u8::MAX as usize {
-            return Err(DataBaseErr::Str("Строка слишком длинная!".into()));
-        }
         let mut res = Vec::new();
         res.extend_from_slice(&[3]);
-        res.extend_from_slice(&[self.len() as u8]);
+        res.extend_from_slice(&(self.len() as u32).to_ne_bytes());
         res.extend_from_slice(self.as_bytes());
         Ok(res)
     }

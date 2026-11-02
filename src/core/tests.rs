@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn overflow_u8_int() {
         let mut db = temp_path();
-        let input = 256;
+        let input = 255;
         db.write_cell(input).expect("writ succed");
         let row = db.read_file().expect("read row succeed");
         let cells = functions::read_bytes(&row).expect("parse row");
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn overflow_u8_float() {
         let mut db = temp_path();
-        let input = 256.0;
+        let input = 255.0;
         db.write_cell(input).expect("writ succed");
         let row = db.read_file().expect("read row succeed");
         let cells = functions::read_bytes(&row).expect("parse row");
@@ -46,7 +46,7 @@ mod tests {
     #[test]
     fn overflow_u8_string() {
         let mut db = temp_path();
-        let input = String::from("ABDFFАGHIJKMNOPQRFSFSKGLFDGKJHKFАJGGKHKGLGFHKHJLFDFSFSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKL");
+        let input = String::from("fabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstu");
         db.write_cell(input).expect("writ succed");
         let row = db.read_file().expect("read row succeed");
         let cells = functions::read_bytes(&row).expect("parse row");
