@@ -84,6 +84,16 @@ impl ToBytes for String {
     }
 }
 
+impl ToBytes for &str {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::new();
+        res.extend_from_slice(&[TEXT_TAG]);
+        res.extend_from_slice(&(self.len() as u32).to_ne_bytes());
+        res.extend_from_slice(self.as_bytes());
+        res
+    }
+}
+
 //------------------------------------------------------------------------------//
 
 pub trait EncodeKey {
