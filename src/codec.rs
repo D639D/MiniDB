@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use crate::errors::{self, FromBytesError};
 
 pub const INT_TAG: u8 = 1;

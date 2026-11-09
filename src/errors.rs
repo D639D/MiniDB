@@ -19,7 +19,7 @@ pub enum DataBaseErrorKind {
     UnknownTypeKey,
     UnknownType,
     EmptyArray,
-    FailFromBytes
+    FailFromBytes,
 }
 
 // -------------------------------- //
@@ -34,18 +34,16 @@ pub enum ReadErrorKind {
     Io(io::Error),
     FailDecode,
     EmptyArray,
-    UnknownType
+    UnknownType,
 }
 
 // -------------------------------- //
-
+#[derive(Debug)]
 pub struct FromBytesError {
     pub kind: FromBytesErrorKind,
 }
-
+#[derive(Debug)]
 pub enum FromBytesErrorKind {
     Io(io::Error),
     FailDecodeFromBytes,
 }
-
-
