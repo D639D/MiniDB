@@ -47,3 +47,13 @@ pub enum FromBytesErrorKind {
     Io(io::Error),
     FailDecodeFromBytes,
 }
+
+#[derive(Debug)]
+pub struct LogFile {
+    pub kind: LogFileKind,
+}
+#[derive(Debug)]
+pub enum LogFileKind {
+    Io(io::Error),
+    FailCreateLogIndex,
+}
