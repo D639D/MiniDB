@@ -1,6 +1,4 @@
-use std::io::Read;
-
-use crate::errors::{self, FromBytesError};
+use crate::errors::{self};
 
 pub const INT_TAG: u8 = 1;
 pub const FLOAT_TAG: u8 = 2;
@@ -20,14 +18,18 @@ pub enum Types {
 
 pub trait FromBytes {
     type Output;
-    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::FromBytesError>;
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError>;
 }
 
 impl FromBytes for i32 {
     type Output = i32;
-    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, FromBytesError> {
-        let array: [u8; 4] = bytes.try_into().map_err(|_| errors::FromBytesError {
-            kind: errors::FromBytesErrorKind::FailDecodeFromBytes,
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
+        let actual = bytes.len();
+        let array: [u8; 4] = bytes.try_into().map_err(|_| errors::CodecError {
+            kind: errors::CodecErrorKind::InvalidLength {
+                expected: 8,
+                actual,
+            },
         })?;
         Ok(i32::from_ne_bytes(array))
     }
@@ -35,9 +37,13 @@ impl FromBytes for i32 {
 
 impl FromBytes for f64 {
     type Output = f64;
-    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, FromBytesError> {
-        let array: [u8; 8] = bytes.try_into().map_err(|_| errors::FromBytesError {
-            kind: errors::FromBytesErrorKind::FailDecodeFromBytes,
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
+        let actual = bytes.len();
+        let array: [u8; 8] = bytes.try_into().map_err(|_| errors::CodecError {
+            kind: errors::CodecErrorKind::InvalidLength {
+                expected: 8,
+                actual,
+            },
         })?;
         Ok(f64::from_ne_bytes(array))
     }
@@ -45,9 +51,9 @@ impl FromBytes for f64 {
 
 impl FromBytes for String {
     type Output = String;
-    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, FromBytesError> {
-        String::from_utf8(bytes).map_err(|_| errors::FromBytesError {
-            kind: errors::FromBytesErrorKind::FailDecodeFromBytes,
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
+        String::from_utf8(bytes).map_err(|_| errors::CodecError {
+            kind: errors::CodecErrorKind::InvalidUtf8,
         })
     }
 }
@@ -114,41 +120,30 @@ impl EncodeKey for &str {
 
 //------------------------------------------------------------------------------//
 
-pub fn read_cell(value: &[u8]) -> Result<(Types, usize), errors::ReadCellError> {
+pub fn read_cell(value: &[u8]) -> Result<(Types, usize), errors::CodecError> {
+    println!("{:?}", value);
     match value {
-        [] => Err(errors::ReadCellError {
-            kind: errors::ReadErrorKind::EmptyArray,
+        [] => Err(errors::CodecError {
+            kind: errors::CodecErrorKind::Truncated,
         }),
 
         [INT_TAG, a, b, c, d, ..] => {
             let arr: [u8; 4] = [*a, *b, *c, *d];
-            i32::from_bytes(arr.to_vec())
-                .map(|i| (Types::Int(i), arr.len() + 1))
-                .map_err(|_| errors::ReadCellError {
-                    kind: errors::ReadErrorKind::FailDecode,
-                })
+            i32::from_bytes(arr.to_vec()).map(|i| (Types::Int(i), arr.len() + 1))
         }
         [FLOAT_TAG, a, b, c, d, e, f, g, h, ..] => {
             let arr: [u8; 8] = [*a, *b, *c, *d, *e, *f, *g, *h];
-            f64::from_bytes(arr.to_vec())
-                .map(|f| (Types::Float(f), arr.len() + 1))
-                .map_err(|_| errors::ReadCellError {
-                    kind: errors::ReadErrorKind::FailDecode,
-                })
+            f64::from_bytes(arr.to_vec()).map(|f| (Types::Float(f), arr.len() + 1))
         }
         [TEXT_TAG, a, b, c, d, data @ ..] => {
             let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
-            let arr = data.get(..len).ok_or_else(|| errors::ReadCellError {
-                kind: errors::ReadErrorKind::FailDecode,
+            let arr = data.get(..len).ok_or(errors::CodecError {
+                kind: errors::CodecErrorKind::Truncated,
             })?;
-            String::from_bytes(arr.to_vec())
-                .map(|s| (Types::Text(s), arr.len() + 5))
-                .map_err(|_| errors::ReadCellError {
-                    kind: errors::ReadErrorKind::FailDecode,
-                })
+            String::from_bytes(arr.to_vec()).map(|s| (Types::Text(s), arr.len() + 5))
         }
-        _ => Err(errors::ReadCellError {
-            kind: errors::ReadErrorKind::UnknownType,
+        [tag, ..] => Err(errors::CodecError {
+            kind: errors::CodecErrorKind::UnknowTag(*tag),
         }),
     }
 }

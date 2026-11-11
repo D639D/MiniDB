@@ -4,8 +4,14 @@ use std::collections::HashMap;
 pub struct KeyDir {
     pub keydir: HashMap<String, KeyDirEntry>,
 }
+
 #[derive(Debug)]
 pub struct KeyDirEntry {
+    pub index: LogIndex,
+}
+
+#[derive(Debug)]
+pub struct LogIndex {
     pub offset: usize,
     pub len: usize,
 }
@@ -17,11 +23,8 @@ impl KeyDir {
         };
         keydir
     }
-    pub fn set(&mut self, key: String, offset: usize, len: usize) -> Option<KeyDirEntry> {
-        let keydir_entry = KeyDirEntry {
-            offset: offset,
-            len: len,
-        };
+    pub fn set(&mut self, key: String, logindex: LogIndex) -> Option<KeyDirEntry> {
+        let keydir_entry = KeyDirEntry { index: logindex };
         self.keydir.insert(key, keydir_entry)
     }
 
