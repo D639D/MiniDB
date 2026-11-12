@@ -1,11 +1,4 @@
-use crate::codec::Types;
-use crate::codec::{EncodeKey, FromBytes, ToBytes};
-use crate::codec::{FLOAT_TAG, INT_TAG, KEY_TAG, TEXT_TAG};
-use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, Write};
-
-use crate::errors;
-
+use std::fs::File;
 pub struct Writer {
     pub active_data_file: File
 }

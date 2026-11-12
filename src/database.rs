@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, Write};
-
-use crate::keydir::{KeyDir, LogIndex};
-use crate::writer::Writer;
+use std::path::PathBuf;
 
 use crate::codec::Types;
 use crate::codec::{EncodeKey, ToBytes, read_cell};
-
 use crate::errors::{self};
+use crate::keydir::KeyDir;
+use crate::logfile::LogIndex;
+use crate::writer::Writer;
 
 pub struct DataBase {
     writer: Writer,
@@ -17,20 +17,18 @@ pub struct DataBase {
 }
 
 impl DataBase {
-    pub fn new(name: &str) -> Result<DataBase, errors::DataBaseError> {
+    pub fn new(name: &str, minidbdir: &PathBuf) -> Result<DataBase, errors::DataBaseError> {
         let file = OpenOptions::new()
             .write(true)
             .read(true)
             .create(true)
-            .truncate(true)
+            .append(true)
             .open(name)
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
 
-        let keydir = KeyDir {
-            keydir: HashMap::new(),
-        };
+        let keydir = KeyDir::new(minidbdir);
 
         let writer = Writer {
             active_data_file: file,
