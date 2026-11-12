@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::OpenOptions;
-use std::io::{Error, Read, Seek, Write};
+use std::io::{Read, Seek, Write};
 
 use crate::keydir::{KeyDir, LogIndex};
 use crate::writer::Writer;
@@ -51,26 +51,18 @@ impl DataBase {
         let encode_key = key.encode_key();
         let encode_data = data.to_bytes();
 
-        let logindex = self.wtire_to_active_data_file(&encode_key, &encode_data)?;
+        let logindex = self.write_to_active_data_file(&encode_key, &encode_data)?;
 
         self.keydir.set(key.to_string(), logindex);
 
         Ok(())
     }
 
-    pub fn wtire_to_active_data_file(
+    pub fn write_to_active_data_file(
         &mut self,
         encode_key: &[u8],
         encode_data: &[u8],
     ) -> Result<LogIndex, errors::DataBaseError> {
-        let offset = self
-            .writer
-            .active_data_file
-            .stream_position()
-            .map_err(|err| errors::DataBaseError {
-                kind: errors::DataBaseErrorKind::Io(err),
-            })? as usize;
-
         let len = encode_data.len();
         self.writer
             .active_data_file
@@ -78,13 +70,20 @@ impl DataBase {
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
+
+        let offset = self
+            .writer
+            .active_data_file
+            .stream_position()
+            .map_err(|err| errors::DataBaseError {
+                kind: errors::DataBaseErrorKind::Io(err),
+            })? as usize;
         self.writer
             .active_data_file
             .write_all(&encode_data)
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
-
         Ok(LogIndex {
             offset: offset,
             len: len,
@@ -93,32 +92,32 @@ impl DataBase {
 
     pub fn get(&mut self, key: String) -> Result<(Types, usize), errors::DataBaseError> {
         let index = self.keydir.get(key);
-        println!("1");
+        println!("DataBase: get -> 1. Index: {:?}", &index);
         let offset = index.index.offset as u64;
-        println!("2");
+        println!("DataBase: get -> 2. Offset: {:?}", &offset);
         let len = index.index.len;
-        println!("3");
+        println!("DataBase: get -> 3. Len: {:?}", &len);
         let mut buf = vec![0; len];
-        println!("4");
+        println!("DataBase: get -> 4. Buf: {:?}", &buf);
         self.writer
             .active_data_file
-            .seek(std::io::SeekFrom::Start(0))
+            .seek(std::io::SeekFrom::Start(offset))
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
-        println!("5");
+        println!("DataBase: get -> 5");
         self.writer
             .active_data_file
             .read(&mut buf)
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
-        println!("6");
+        println!("DataBase: get -> 6. Buf: {:?}", &buf);
 
         let res = read_cell(&buf).map_err(|err| errors::DataBaseError {
             kind: errors::DataBaseErrorKind::Codec(err),
         })?;
-        println!("7");
+        println!("DataBase: get -> 7. Res: {:?}", &res);
         Ok(res)
     }
 }

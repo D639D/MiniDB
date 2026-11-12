@@ -5,6 +5,9 @@ fn main() {
     // println!("{:?}", db.get("User").unwrap());
 
     let mut db = DataBase::new("main").unwrap();
-    println!("{:?}", db.set("User", 1));
-    println!("{:?}", db.get(String::from("User")));
+    db.set("User1", 1);
+    db.set("User2", 1.0);
+    db.set("User3", "1");
+    db.set("User1", 2);
+    println!("{:?}", db.get(String::from("User3")));
 }
