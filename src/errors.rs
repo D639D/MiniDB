@@ -18,4 +18,3 @@ pub enum DataBaseErrorKind {
 pub struct DataBaseError {
     pub kind: DataBaseErrorKind,
 }
-

@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::path:: PathBuf;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct LogIndex {

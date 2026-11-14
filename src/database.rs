@@ -2,7 +2,6 @@ use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, Write};
 
-
 use crate::codec::Types;
 use crate::codec::{EncodeKey, ToBytes, read_cell};
 use crate::errors::{self};
