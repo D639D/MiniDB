@@ -1,11 +1,9 @@
 use crate::logfile::LogIndex;
+use std::fs::File;
 use std::{
     collections::HashMap,
     io::{Read, Seek},
 };
-use std::fs::File;
-
-
 
 use crate::codec::FromBytes;
 use crate::codec::{FLOAT_TAG, INT_TAG, KEY_TAG, TEXT_TAG};
@@ -21,7 +19,7 @@ pub struct KeyDirEntry {
 
 impl KeyDir {
     pub fn new() -> KeyDir {
-        let  keydir = KeyDir {
+        let keydir = KeyDir {
             keydir: HashMap::new(),
         };
         keydir
@@ -67,7 +65,7 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                 match next_tag {
                     [] => {
                         //
-                    },
+                    }
                     [INT_TAG, ..] => {
                         let index = LogIndex {
                             offset: 1 + 4 + len_key + offset as usize,
@@ -76,7 +74,7 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 5;
-                    },
+                    }
                     [FLOAT_TAG, ..] => {
                         let index = LogIndex {
                             offset: 1 + 4 + len_key + offset as usize,
@@ -85,7 +83,7 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 9;
-                    },
+                    }
                     [TEXT_TAG, a, b, c, d, ..] => {
                         let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
                         let index = LogIndex {
@@ -95,7 +93,7 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
-                    },
+                    }
                     _ => {
                         //
                     }
@@ -105,5 +103,5 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                 break;
             }
         };
-    };
+    }
 }
