@@ -1,11 +1,9 @@
 use minidb::database::DataBase;
-use std::path::PathBuf;
 fn main() {
-    // let mut db = DataBase::create("main").unwrap();
-    // db.set("User", "1").unwrap();
-    // println!("{:?}", db.get("User").unwrap());
-    let path = PathBuf::new();
-    let mut db = DataBase::new("main", &path).unwrap();
-
-    println!("{:?}", db.get(String::from("User")));
+    let mut db = DataBase::new("main").unwrap();
+    // db.set("User1", 1).unwrap();
+    // db.set("User2", 1.0).unwrap();
+    // db.set("User3", "1").unwrap();
+    // db.set("User4", 100).unwrap();
+    println!("{:?}", db.get(String::from("User4")));
 }

@@ -121,6 +121,7 @@ impl EncodeKey for &str {
 //------------------------------------------------------------------------------//
 
 pub fn read_cell(value: &[u8]) -> Result<(Types, usize), errors::CodecError> {
+    println!("ReadCell: {:?}", &value);
     match value {
         [] => Err(errors::CodecError {
             kind: errors::CodecErrorKind::Truncated,
