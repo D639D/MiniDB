@@ -5,6 +5,7 @@ pub const FLOAT_TAG: u8 = 2;
 pub const BOOL_TAG: u8 = 3;
 pub const TEXT_TAG: u8 = 4;
 pub const KEY_TAG: u8 = 5;
+pub const TOMBSTONE_TAG: u8 = 6;
 
 #[derive(Debug)]
 pub enum Types {
@@ -52,9 +53,22 @@ impl FromBytes for f64 {
 impl FromBytes for String {
     type Output = String;
     fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
+        let actual = bytes.len();
         String::from_utf8(bytes).map_err(|_| errors::CodecError {
-            kind: errors::CodecErrorKind::InvalidUtf8,
+            kind: errors::CodecErrorKind::InvalidLength { expected: 2, actual },
         })
+    }
+}
+
+impl FromBytes for bool {
+    type Output = bool;
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
+        let actual = bytes.len();
+        let arr: [u8; 1] = bytes.try_into().map_err(|_| errors::CodecError {
+            kind: errors::CodecErrorKind::InvalidLength { expected: 1, actual }
+        })?;
+        let res = arr[0] != 0;
+        Ok(res)
     }
 }
 
@@ -102,6 +116,15 @@ impl ToBytes for &str {
     }
 }
 
+impl ToBytes for bool {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(2);
+        res.extend_from_slice(&[BOOL_TAG]);
+        res.extend_from_slice(&[*self as u8]);
+        res
+    }
+}
+
 //------------------------------------------------------------------------------//
 
 pub trait EncodeKey {
@@ -121,6 +144,7 @@ impl EncodeKey for &str {
 //------------------------------------------------------------------------------//
 
 pub fn read_cell(value: &[u8]) -> Result<Types, errors::CodecError> {
+
     match value {
         [] => Err(errors::CodecError {
             kind: errors::CodecErrorKind::Truncated,
@@ -133,6 +157,10 @@ pub fn read_cell(value: &[u8]) -> Result<Types, errors::CodecError> {
         [FLOAT_TAG, a, b, c, d, e, f, g, h, ..] => {
             let arr: [u8; 8] = [*a, *b, *c, *d, *e, *f, *g, *h];
             f64::from_bytes(arr.to_vec()).map(Types::Float)
+        }
+        [BOOL_TAG, a, ..] => {
+            let arr: [u8; 1] = [*a];
+            bool::from_bytes(arr.to_vec()).map(Types::Bool)
         }
         [TEXT_TAG, a, b, c, d, data @ ..] => {
             let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;

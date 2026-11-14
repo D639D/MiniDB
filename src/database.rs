@@ -17,7 +17,7 @@ pub struct DataBase {
 
 impl DataBase {
     pub fn new(name: &str) -> Result<DataBase, errors::DataBaseError> {
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .write(true)
             .read(true)
             .create(true)
@@ -26,7 +26,7 @@ impl DataBase {
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
-        let keydir = KeyDir::new();
+        let keydir = KeyDir::new(&mut file);
 
         let writer = Writer {
             active_data_file: file,
@@ -44,7 +44,9 @@ impl DataBase {
         data: V,
     ) -> Result<(), errors::DataBaseError> {
         let encode_key = key.encode_key();
+
         let encode_data = data.to_bytes();
+
 
         let logindex = self.write_to_active_data_file(&encode_key, &encode_data)?;
 
@@ -88,7 +90,7 @@ impl DataBase {
     pub fn get(&mut self, key: String) -> Result<Types, errors::DataBaseError> {
         let index = self
             .keydir
-            .get(key, &mut self.writer.active_data_file)
+            .get(key)
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::KeyDir(err),
             })?;
@@ -113,4 +115,8 @@ impl DataBase {
         })?;
         Ok(res)
     }
+
+    // pub fn delete(&mut self, key: String) {
+    //     self.
+    // }
 }

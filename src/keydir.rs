@@ -6,7 +6,7 @@ use std::{
     io::{Read, Seek},
 };
 
-use crate::codec::FromBytes;
+use crate::codec::{BOOL_TAG, FromBytes};
 use crate::codec::{FLOAT_TAG, INT_TAG, KEY_TAG, TEXT_TAG};
 #[derive(Debug)]
 pub struct KeyDir {
@@ -19,10 +19,11 @@ pub struct KeyDirEntry {
 }
 
 impl KeyDir {
-    pub fn new() -> KeyDir {
-        let keydir = KeyDir {
+    pub fn new(file: &mut File) -> KeyDir {
+        let mut keydir = KeyDir {
             keydir: HashMap::new(),
         };
+        populate_keydir_with_data_file(file, &mut keydir).unwrap(); // <- Unwrap - осознанное решение
         keydir
     }
     pub fn set(&mut self, key: String, logindex: LogIndex) -> Option<KeyDirEntry> {
@@ -33,19 +34,18 @@ impl KeyDir {
     pub fn get(
         &mut self,
         key: String,
-        file: &mut File,
     ) -> Result<&KeyDirEntry, errors::KeyDirError> {
-        if self.keydir.is_empty() {
-            let _ = populate_keydir_with_data_file(file, self);
-            let res = self.keydir.get(&key).ok_or(errors::KeyDirError {
-                kind: errors::KeyDirErrorKind::KeyNotFound,
-            })?;
-            return Ok(res);
-        }
         let res = self.keydir.get(&key).ok_or(errors::KeyDirError {
             kind: errors::KeyDirErrorKind::KeyNotFound,
         })?;
         return Ok(res);
+    }
+
+    pub fn delete(&mut self, key: String) -> Result<(), errors::KeyDirError> {
+        self.keydir.remove(&key).ok_or(errors::KeyDirError {
+            kind: errors::KeyDirErrorKind::KeyNotFound,
+        })?;
+        Ok(())
     }
 }
 
@@ -74,10 +74,9 @@ pub fn populate_keydir_with_data_file(
         let slice: &[u8] = &buf;
         match slice {
             [] => {
-                return Err(errors::KeyDirError {
-                    kind: errors::KeyDirErrorKind::Truncated,
-                });
+                return Ok(());
             }
+            
             [KEY_TAG, a, b, c, d, data @ ..] => {
                 // Превращаем 4 байта после KEY_TAG в длинну данных
 
@@ -94,6 +93,7 @@ pub fn populate_keydir_with_data_file(
                 let next_tag = data.get(len_key..).ok_or(errors::KeyDirError {
                     kind: errors::KeyDirErrorKind::Truncated,
                 })?;
+                
                 match next_tag {
                     [] => {
                         return Err(errors::KeyDirError {
@@ -105,7 +105,7 @@ pub fn populate_keydir_with_data_file(
                             offset: 1 + 4 + len_key + offset as usize,
                             len: 5,
                         };
-                        let log = KeyDirEntry { index: index };
+                        let log = KeyDirEntry { index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 5;
                         continue;
@@ -115,9 +115,20 @@ pub fn populate_keydir_with_data_file(
                             offset: 1 + 4 + len_key + offset as usize,
                             len: 9,
                         };
-                        let log = KeyDirEntry { index: index };
+                        let log = KeyDirEntry { index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 9;
+                        continue;
+                    }
+                    
+                    [BOOL_TAG, ..] => {
+                        let index = LogIndex {
+                            offset: 1 + 4 + len_key + offset as usize,
+                            len: 2
+                        };
+                        let log = KeyDirEntry { index };
+                        keydir.keydir.insert(key, log);
+                        offset += 1 + 4 + len_key as u64 + 2;
                         continue;
                     }
                     [TEXT_TAG, a, b, c, d, ..] => {
@@ -126,7 +137,7 @@ pub fn populate_keydir_with_data_file(
                             offset: 1 + 4 + len_key + offset as usize,
                             len: 1 + 4 + len,
                         };
-                        let log = KeyDirEntry { index: index };
+                        let log = KeyDirEntry { index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
                         continue;
