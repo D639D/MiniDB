@@ -10,13 +10,15 @@ pub enum CodecErrorKind {
 pub struct CodecError {
     pub kind: CodecErrorKind,
 }
-
+#[derive(Debug)]
 pub enum KeyDirErrorKind {
     Truncated,
     UnknowTag(u8),
+    KeyNotFound,
     Io(std::io::Error),
     Codec(CodecError),
 }
+#[derive(Debug)]
 pub struct KeyDirError {
     pub kind: KeyDirErrorKind,
 }
@@ -25,7 +27,7 @@ pub struct KeyDirError {
 pub enum DataBaseErrorKind {
     Io(std::io::Error),
     Codec(CodecError),
-    KeyDir(CodecError),
+    KeyDir(KeyDirError),
 }
 #[derive(Debug)]
 pub struct DataBaseError {

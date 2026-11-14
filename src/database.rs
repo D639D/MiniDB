@@ -86,7 +86,12 @@ impl DataBase {
     }
 
     pub fn get(&mut self, key: String) -> Result<Types, errors::DataBaseError> {
-        let index = self.keydir.get(key, &mut self.writer.active_data_file);
+        let index = self
+            .keydir
+            .get(key, &mut self.writer.active_data_file)
+            .map_err(|err| errors::DataBaseError {
+                kind: errors::DataBaseErrorKind::KeyDir(err),
+            })?;
         let offset = index.index.offset as u64;
         let len = index.index.len;
         let mut buf = vec![0; len];
