@@ -120,7 +120,7 @@ impl EncodeKey for &str {
 
 //------------------------------------------------------------------------------//
 
-pub fn read_cell(value: &[u8]) -> Result<(Types, usize), errors::CodecError> {
+pub fn read_cell(value: &[u8]) -> Result<Types, errors::CodecError> {
     match value {
         [] => Err(errors::CodecError {
             kind: errors::CodecErrorKind::Truncated,
@@ -128,18 +128,18 @@ pub fn read_cell(value: &[u8]) -> Result<(Types, usize), errors::CodecError> {
 
         [INT_TAG, a, b, c, d, ..] => {
             let arr: [u8; 4] = [*a, *b, *c, *d];
-            i32::from_bytes(arr.to_vec()).map(|i| (Types::Int(i), arr.len() + 1))
+            i32::from_bytes(arr.to_vec()).map(Types::Int)
         }
         [FLOAT_TAG, a, b, c, d, e, f, g, h, ..] => {
             let arr: [u8; 8] = [*a, *b, *c, *d, *e, *f, *g, *h];
-            f64::from_bytes(arr.to_vec()).map(|f| (Types::Float(f), arr.len() + 1))
+            f64::from_bytes(arr.to_vec()).map(Types::Float)
         }
         [TEXT_TAG, a, b, c, d, data @ ..] => {
             let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
             let arr = data.get(..len).ok_or(errors::CodecError {
                 kind: errors::CodecErrorKind::Truncated,
             })?;
-            String::from_bytes(arr.to_vec()).map(|s| (Types::Text(s), arr.len() + 5))
+            String::from_bytes(arr.to_vec()).map(Types::Text)
         }
         [tag, ..] => Err(errors::CodecError {
             kind: errors::CodecErrorKind::UnknowTag(*tag),

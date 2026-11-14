@@ -1,3 +1,4 @@
+use crate::errors::{self};
 use crate::logfile::LogIndex;
 use std::fs::File;
 use std::{
@@ -31,7 +32,7 @@ impl KeyDir {
 
     pub fn get(&mut self, key: String, file: &mut File) -> &KeyDirEntry {
         if self.keydir.is_empty() {
-            populate_keydir_with_data_file(file, self);
+            let _ = populate_keydir_with_data_file(file, self);
             let res = self.keydir.get(&key).unwrap();
             return res;
         }
@@ -40,32 +41,53 @@ impl KeyDir {
     }
 }
 
-pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
-    file.seek(std::io::SeekFrom::Start(0)).unwrap();
-    let mut offset = file.stream_position().unwrap();
+pub fn populate_keydir_with_data_file(
+    file: &mut File,
+    keydir: &mut KeyDir,
+) -> Result<(), errors::KeyDirError> {
+    file.seek(std::io::SeekFrom::Start(0))
+        .map_err(|err| errors::KeyDirError {
+            kind: errors::KeyDirErrorKind::Io(err),
+        })?;
+    let mut offset = file.stream_position().map_err(|err| errors::KeyDirError {
+        kind: errors::KeyDirErrorKind::Io(err),
+    })?;
     loop {
         let mut buf = Vec::new();
         buf.clear();
-        file.seek(std::io::SeekFrom::Start(offset)).unwrap();
-        file.read_to_end(&mut buf).unwrap();
+        file.seek(std::io::SeekFrom::Start(offset))
+            .map_err(|err| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Io(err),
+            })?;
+        file.read_to_end(&mut buf)
+            .map_err(|err| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Io(err),
+            })?;
         let slice: &[u8] = &buf;
         match slice {
-            [] => {
-                break;
-            }
+            [] => return Err(errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Truncated,
+            }),
             [KEY_TAG, a, b, c, d, data @ ..] => {
                 // Превращаем 4 байта после KEY_TAG в длинну данных
 
                 let len_key = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
                 // Получаем данные из байтов, по длинне данных
-                let arr_key = data.get(..len_key).unwrap();
-                let key = String::from_bytes(arr_key.to_vec()).unwrap();
+                let arr_key = data.get(..len_key).ok_or(errors::KeyDirError {
+                    kind: errors::KeyDirErrorKind::Truncated,
+                })?;
+                let key =
+                    String::from_bytes(arr_key.to_vec()).map_err(|err| errors::KeyDirError {
+                        kind: errors::KeyDirErrorKind::Codec(err),
+                    })?;
                 // Переходи на следующий тег данных
-                let next_tag = data.get(len_key..).unwrap();
+                let next_tag = data.get(len_key..).ok_or(errors::KeyDirError {
+                    kind: errors::KeyDirErrorKind::Truncated,
+                })?;
                 match next_tag {
-                    [] => {
-                        //
-                    }
+                    [] => return Err(errors::KeyDirError {
+                        kind: errors::KeyDirErrorKind::Truncated,
+                    }),
                     [INT_TAG, ..] => {
                         let index = LogIndex {
                             offset: 1 + 4 + len_key + offset as usize,
@@ -74,6 +96,7 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 5;
+                        continue;
                     }
                     [FLOAT_TAG, ..] => {
                         let index = LogIndex {
@@ -83,6 +106,8 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len_key as u64 + 9;
+                        continue;
+
                     }
                     [TEXT_TAG, a, b, c, d, ..] => {
                         let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
@@ -93,15 +118,16 @@ pub fn populate_keydir_with_data_file(file: &mut File, keydir: &mut KeyDir) {
                         let log = KeyDirEntry { index: index };
                         keydir.keydir.insert(key, log);
                         offset += 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
+                        continue;
                     }
-                    _ => {
-                        //
-                    }
-                };
+                    [tag, ..] => return Err(errors::KeyDirError {
+                        kind: errors::KeyDirErrorKind::UnknowTag(*tag),
+                    }),
+                }
             }
-            _ => {
-                break;
-            }
+            [tag, ..] => return Err(errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::UnknowTag(*tag),
+            }),
         };
     }
 }
