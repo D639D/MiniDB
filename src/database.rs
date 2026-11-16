@@ -47,7 +47,6 @@ impl DataBase {
 
         let encode_data = data.to_bytes();
 
-
         let logindex = self.write_to_active_data_file(&encode_key, &encode_data)?;
 
         self.keydir.set(key.to_string(), logindex);
@@ -67,7 +66,6 @@ impl DataBase {
             .map_err(|err| errors::DataBaseError {
                 kind: errors::DataBaseErrorKind::Io(err),
             })?;
-
         let offset = self
             .writer
             .active_data_file
@@ -88,12 +86,9 @@ impl DataBase {
     }
 
     pub fn get(&mut self, key: String) -> Result<Types, errors::DataBaseError> {
-        let index = self
-            .keydir
-            .get(key)
-            .map_err(|err| errors::DataBaseError {
-                kind: errors::DataBaseErrorKind::KeyDir(err),
-            })?;
+        let index = self.keydir.get(key).map_err(|err| errors::DataBaseError {
+            kind: errors::DataBaseErrorKind::KeyDir(err),
+        })?;
         let offset = index.index.offset as u64;
         let len = index.index.len;
         let mut buf = vec![0; len];
@@ -116,7 +111,9 @@ impl DataBase {
         Ok(res)
     }
 
-    // pub fn delete(&mut self, key: String) {
-    //     self.
-    // }
+    pub fn delete(&mut self, key: String) {
+        self.keydir
+            .delete(&mut self.writer.active_data_file, &key)
+            .unwrap();
+    }
 }

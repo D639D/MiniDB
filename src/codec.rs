@@ -55,7 +55,10 @@ impl FromBytes for String {
     fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
         let actual = bytes.len();
         String::from_utf8(bytes).map_err(|_| errors::CodecError {
-            kind: errors::CodecErrorKind::InvalidLength { expected: 2, actual },
+            kind: errors::CodecErrorKind::InvalidLength {
+                expected: 2,
+                actual,
+            },
         })
     }
 }
@@ -65,7 +68,10 @@ impl FromBytes for bool {
     fn from_bytes(bytes: Vec<u8>) -> Result<Self::Output, errors::CodecError> {
         let actual = bytes.len();
         let arr: [u8; 1] = bytes.try_into().map_err(|_| errors::CodecError {
-            kind: errors::CodecErrorKind::InvalidLength { expected: 1, actual }
+            kind: errors::CodecErrorKind::InvalidLength {
+                expected: 1,
+                actual,
+            },
         })?;
         let res = arr[0] != 0;
         Ok(res)
@@ -144,7 +150,6 @@ impl EncodeKey for &str {
 //------------------------------------------------------------------------------//
 
 pub fn read_cell(value: &[u8]) -> Result<Types, errors::CodecError> {
-
     match value {
         [] => Err(errors::CodecError {
             kind: errors::CodecErrorKind::Truncated,

@@ -1,13 +1,14 @@
 use crate::errors::{self};
 use crate::logfile::LogIndex;
 use std::fs::File;
+use std::io::Write;
 use std::{
     collections::HashMap,
     io::{Read, Seek},
 };
 
-use crate::codec::{BOOL_TAG, FromBytes};
-use crate::codec::{FLOAT_TAG, INT_TAG, KEY_TAG, TEXT_TAG};
+use crate::codec::{BOOL_TAG, EncodeKey, FromBytes};
+use crate::codec::{FLOAT_TAG, INT_TAG, KEY_TAG, TEXT_TAG, TOMBSTONE_TAG};
 #[derive(Debug)]
 pub struct KeyDir {
     pub keydir: HashMap<String, KeyDirEntry>,
@@ -31,20 +32,39 @@ impl KeyDir {
         self.keydir.insert(key, keydir_entry)
     }
 
-    pub fn get(
-        &mut self,
-        key: String,
-    ) -> Result<&KeyDirEntry, errors::KeyDirError> {
+    pub fn get(&mut self, key: String) -> Result<&KeyDirEntry, errors::KeyDirError> {
         let res = self.keydir.get(&key).ok_or(errors::KeyDirError {
             kind: errors::KeyDirErrorKind::KeyNotFound,
         })?;
         return Ok(res);
     }
 
-    pub fn delete(&mut self, key: String) -> Result<(), errors::KeyDirError> {
-        self.keydir.remove(&key).ok_or(errors::KeyDirError {
-            kind: errors::KeyDirErrorKind::KeyNotFound,
+    pub fn delete(&mut self, file: &mut File, key: &str) -> Result<(), errors::KeyDirError> {
+        let data = self
+            .keydir
+            .get(&key.to_string())
+            .ok_or_else(|| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Truncated,
+            })?;
+        let offset = data.index.offset as u64;
+        let len = data.index.len;
+        let encode_key = key.encode_key();
+        let mut buf = vec![0; len];
+        self.keydir.remove(key);
+        file.seek(std::io::SeekFrom::Start(offset))
+            .map_err(|err| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Io(err),
+            })?;
+        file.read(&mut buf).map_err(|err| errors::KeyDirError {
+            kind: errors::KeyDirErrorKind::Io(err),
         })?;
+        buf.insert(0, TOMBSTONE_TAG);
+        file.write_all(&encode_key).map_err(|err| errors::KeyDirError {
+            kind: errors::KeyDirErrorKind::Io(err)
+        })?;
+        file.write_all(&buf).map_err(|err| errors::KeyDirError {
+            kind: errors::KeyDirErrorKind::Io(err)
+        })?;;
         Ok(())
     }
 }
@@ -71,12 +91,13 @@ pub fn populate_keydir_with_data_file(
             .map_err(|err| errors::KeyDirError {
                 kind: errors::KeyDirErrorKind::Io(err),
             })?;
+
         let slice: &[u8] = &buf;
         match slice {
             [] => {
                 return Ok(());
             }
-            
+
             [KEY_TAG, a, b, c, d, data @ ..] => {
                 // Превращаем 4 байта после KEY_TAG в длинну данных
 
@@ -93,60 +114,107 @@ pub fn populate_keydir_with_data_file(
                 let next_tag = data.get(len_key..).ok_or(errors::KeyDirError {
                     kind: errors::KeyDirErrorKind::Truncated,
                 })?;
-                
+
                 match next_tag {
                     [] => {
-                        return Err(errors::KeyDirError {
-                            kind: errors::KeyDirErrorKind::Truncated,
-                        });
+                        return Ok(());
                     }
-                    [INT_TAG, ..] => {
-                        let index = LogIndex {
-                            offset: 1 + 4 + len_key + offset as usize,
-                            len: 5,
-                        };
-                        let log = KeyDirEntry { index };
-                        keydir.keydir.insert(key, log);
-                        offset += 1 + 4 + len_key as u64 + 5;
-                        continue;
-                    }
-                    [FLOAT_TAG, ..] => {
-                        let index = LogIndex {
-                            offset: 1 + 4 + len_key + offset as usize,
-                            len: 9,
-                        };
-                        let log = KeyDirEntry { index };
-                        keydir.keydir.insert(key, log);
-                        offset += 1 + 4 + len_key as u64 + 9;
-                        continue;
-                    }
-                    
-                    [BOOL_TAG, ..] => {
-                        let index = LogIndex {
-                            offset: 1 + 4 + len_key + offset as usize,
-                            len: 2
-                        };
-                        let log = KeyDirEntry { index };
-                        keydir.keydir.insert(key, log);
-                        offset += 1 + 4 + len_key as u64 + 2;
-                        continue;
-                    }
-                    [TEXT_TAG, a, b, c, d, ..] => {
-                        let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
-                        let index = LogIndex {
-                            offset: 1 + 4 + len_key + offset as usize,
-                            len: 1 + 4 + len,
-                        };
-                        let log = KeyDirEntry { index };
-                        keydir.keydir.insert(key, log);
-                        offset += 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
-                        continue;
-                    }
-                    [tag, ..] => {
-                        return Err(errors::KeyDirError {
-                            kind: errors::KeyDirErrorKind::UnknowTag(*tag),
-                        });
-                    }
+                    [TOMBSTONE_TAG, data @ ..] => match data {
+                        [] => {
+                            return Err(errors::KeyDirError {
+                                kind: errors::KeyDirErrorKind::Truncated,
+                            });
+                        }
+                        [INT_TAG, ..] => {
+                            if keydir.keydir.contains_key(&key) {
+                                keydir.keydir.remove(&key);
+                            };
+                            offset += 1 + 1 + 4 + len_key as u64 + 5;
+                            continue;
+                        }
+                        [FLOAT_TAG, ..] => {
+                            if keydir.keydir.contains_key(&key) {
+                                keydir.keydir.remove(&key);
+                            };
+                            offset += 1 + 1 + 4 + len_key as u64 + 9;
+                            continue;
+                        }
+
+                        [BOOL_TAG, ..] => {
+                            if keydir.keydir.contains_key(&key) {
+                                keydir.keydir.remove(&key);
+                            };
+                            offset += 1 + 1 + 4 + len_key as u64 + 2;
+                            continue;
+                        }
+                        [TEXT_TAG, a, b, c, d, ..] => {
+                            if keydir.keydir.contains_key(&key) {
+                                keydir.keydir.remove(&key);
+                            };
+                            let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
+                            offset += 1 + 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
+                            continue;
+                        }
+                        [tag, ..] => {
+                            return Err(errors::KeyDirError {
+                                kind: errors::KeyDirErrorKind::UnknowTag(*tag),
+                            });
+                        }
+                    },
+                    [data @ ..] => match data {
+                        [] => {
+                            return Err(errors::KeyDirError {
+                                kind: errors::KeyDirErrorKind::Truncated,
+                            });
+                        }
+                        [INT_TAG, ..] => {
+                            let index = LogIndex {
+                                offset: 1 + 4 + len_key + offset as usize,
+                                len: 5,
+                            };
+                            let log = KeyDirEntry { index };
+                            keydir.keydir.insert(key, log);
+                            offset += 1 + 4 + len_key as u64 + 5;
+                            continue;
+                        }
+                        [FLOAT_TAG, ..] => {
+                            let index = LogIndex {
+                                offset: 1 + 4 + len_key + offset as usize,
+                                len: 9,
+                            };
+                            let log = KeyDirEntry { index };
+                            keydir.keydir.insert(key, log);
+                            offset += 1 + 4 + len_key as u64 + 9;
+                            continue;
+                        }
+
+                        [BOOL_TAG, ..] => {
+                            let index = LogIndex {
+                                offset: 1 + 4 + len_key + offset as usize,
+                                len: 2,
+                            };
+                            let log = KeyDirEntry { index };
+                            keydir.keydir.insert(key, log);
+                            offset += 1 + 4 + len_key as u64 + 2;
+                            continue;
+                        }
+                        [TEXT_TAG, a, b, c, d, ..] => {
+                            let len = u32::from_ne_bytes([*a, *b, *c, *d]) as usize;
+                            let index = LogIndex {
+                                offset: 1 + 4 + len_key + offset as usize,
+                                len: 1 + 4 + len,
+                            };
+                            let log = KeyDirEntry { index };
+                            keydir.keydir.insert(key, log);
+                            offset += 1 + 4 + len as u64 + 1 + 4 + len_key as u64;
+                            continue;
+                        }
+                        [tag, ..] => {
+                            return Err(errors::KeyDirError {
+                                kind: errors::KeyDirErrorKind::UnknowTag(*tag),
+                            });
+                        }
+                    },
                 }
             }
             [tag, ..] => {
