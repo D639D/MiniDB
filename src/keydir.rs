@@ -58,6 +58,10 @@ impl KeyDir {
         file.read(&mut buf).map_err(|err| errors::KeyDirError {
             kind: errors::KeyDirErrorKind::Io(err),
         })?;
+        file.seek(std::io::SeekFrom::End(0))
+            .map_err(|err| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Io(err),
+            })?;
         buf.insert(0, TOMBSTONE_TAG);
         file.write_all(&encode_key)
             .map_err(|err| errors::KeyDirError {

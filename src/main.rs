@@ -6,5 +6,5 @@ fn main() {
     // db.set("B", 1.0).unwrap();
     // db.delete(String::from("B"));
     // db.set("C", 2.0).unwrap();
-    println!("{:?}", db.get(String::from("A")));
+    println!("{:?}", db.get(String::from("B")));
 }
