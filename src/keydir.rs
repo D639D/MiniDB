@@ -59,12 +59,13 @@ impl KeyDir {
             kind: errors::KeyDirErrorKind::Io(err),
         })?;
         buf.insert(0, TOMBSTONE_TAG);
-        file.write_all(&encode_key).map_err(|err| errors::KeyDirError {
-            kind: errors::KeyDirErrorKind::Io(err)
-        })?;
+        file.write_all(&encode_key)
+            .map_err(|err| errors::KeyDirError {
+                kind: errors::KeyDirErrorKind::Io(err),
+            })?;
         file.write_all(&buf).map_err(|err| errors::KeyDirError {
-            kind: errors::KeyDirErrorKind::Io(err)
-        })?;;
+            kind: errors::KeyDirErrorKind::Io(err),
+        })?;
         Ok(())
     }
 }
